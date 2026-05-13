@@ -1,0 +1,18 @@
+{
+  "name": "checkbalance",
+  "version": "1.0.0",
+  "description": "Binance Wallet Balance Viewer",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.63.1",
+    "axios": "^1.6.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "node-cron": "^4.2.1"
+  }
+}

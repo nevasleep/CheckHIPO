@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CheckBalance — Team Portfolio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ── Header ── -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#F0B90B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <span class="logo-text">CheckBalance</span>
+      </div>
+
+      <!-- Page Nav Tabs -->
+      <nav class="page-nav">
+        <a href="index.html" class="page-nav-tab active" id="tab-binance">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          Binance
+        </a>
+        <a href="bank.html" class="page-nav-tab" id="tab-bank">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2M12 12v5M8 12v5"/></svg>
+          Bank VN
+        </a>
+      </nav>
+
+      <!-- Breadcrumb -->
+      <div class="header-crumb" id="header-crumb">
+        <span class="crumb-item crumb-active">Team Overview</span>
+      </div>
+
+      <div class="header-right">
+        <div class="refresh-info">
+          <span class="refresh-dot" id="refresh-dot"></span>
+          <span id="refresh-label">Loading…</span>
+        </div>
+        <button class="btn-lark" id="btn-lark" onclick="sendToLark()" title="Send balance report to Lark">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+          Send to Lark
+        </button>
+        <button class="btn-refresh" id="btn-refresh">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+          Refresh
+        </button>
+      </div>
+    </div>
+  </header>
+
+
+  <!-- ── TEAM OVERVIEW VIEW ── -->
+  <div id="view-team" class="view">
+    <main class="main">
+
+      <!-- Grand Total Banner -->
+      <div class="grand-total-banner" id="grand-total-banner">
+        <div class="grand-total-left">
+          <div class="grand-label">Team Total Portfolio</div>
+          <div class="grand-value" id="grand-value"><span class="skeleton skeleton-xl"></span></div>
+          <div class="grand-sub" id="grand-sub">Loading wallets…</div>
+        </div>
+        <div class="grand-right">
+          <div class="grand-bar-label">Member Breakdown</div>
+          <div class="grand-bar" id="grand-bar"><span class="skeleton" style="width:100%;height:100%;display:block;border-radius:6px"></span></div>
+          <div class="grand-bar-legend" id="grand-bar-legend"></div>
+        </div>
+      </div>
+
+      <!-- Member Cards Grid -->
+      <div class="section-header" style="margin-top:8px">
+        <h2 class="section-title">Member Wallets</h2>
+      </div>
+      <div class="member-grid" id="member-grid">
+        <!-- Skeleton cards -->
+        <div class="member-card member-card--loading"><div class="member-card-skeleton"></div></div>
+        <div class="member-card member-card--loading"><div class="member-card-skeleton"></div></div>
+        <div class="member-card member-card--loading"><div class="member-card-skeleton"></div></div>
+        <div class="member-card member-card--loading"><div class="member-card-skeleton"></div></div>
+        <div class="member-card member-card--loading"><div class="member-card-skeleton"></div></div>
+        <div class="member-card member-card--loading"><div class="member-card-skeleton"></div></div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ── MEMBER DETAIL VIEW ── -->
+  <div id="view-member" class="view hidden">
+    <main class="main">
+
+      <!-- Member Header -->
+      <div class="member-detail-header" id="member-detail-header">
+        <button class="btn-back" onclick="showTeamView()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          Back to Team
+        </button>
+        <div class="member-detail-title" id="member-detail-title">Member</div>
+        <div class="member-detail-status" id="member-detail-status"></div>
+      </div>
+
+      <!-- Error Banner -->
+      <div class="error-banner" id="error-banner" style="display:none">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="error-text"></span>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="stats-row" id="stats-row">
+        <div class="stat-card" id="card-total">
+          <div class="stat-label">Total Portfolio Value</div>
+          <div class="stat-value" id="stat-total-usd"><span class="skeleton skeleton-lg"></span></div>
+          <div class="stat-sub" id="stat-update-time">Updated just now</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Assets Held</div>
+          <div class="stat-value" id="stat-asset-count"><span class="skeleton skeleton-sm"></span></div>
+          <div class="stat-sub" id="stat-asset-sub">Non-zero balances</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Largest Holding</div>
+          <div class="stat-value" id="stat-top-asset"><span class="skeleton skeleton-sm"></span></div>
+          <div class="stat-sub" id="stat-top-pct">by USD value</div>
+        </div>
+      </div>
+
+      <!-- Chart Bar -->
+      <div class="section">
+        <div class="section-header">
+          <h2 class="section-title">Portfolio Breakdown</h2>
+        </div>
+        <div class="chart-bar" id="chart-bar">
+          <span class="skeleton" style="width:100%;height:100%;display:block;border-radius:8px"></span>
+        </div>
+        <div class="chart-legend" id="chart-legend"></div>
+      </div>
+
+      <!-- Balance Table -->
+      <div class="section">
+        <div class="section-header">
+          <h2 class="section-title">All Balances</h2>
+          <div class="sort-controls">
+            <span class="sort-label">Sort:</span>
+            <button class="sort-btn active" id="sort-usd" onclick="sortBy('usd')">USD Value</button>
+            <button class="sort-btn" id="sort-name" onclick="sortBy('name')">Name</button>
+            <button class="sort-btn" id="sort-amount" onclick="sortBy('amount')">Amount</button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="balance-table">
+            <thead>
+              <tr>
+                <th>#</th><th>Asset</th><th>Available</th><th>In Order</th><th>Total</th><th>Price (USD)</th><th>Value (USD)</th>
+              </tr>
+            </thead>
+            <tbody id="balance-tbody">
+              <tr class="skeleton-row"><td colspan="7"><span class="skeleton" style="width:100%;height:18px;display:block"></span></td></tr>
+              <tr class="skeleton-row"><td colspan="7"><span class="skeleton" style="width:100%;height:18px;display:block"></span></td></tr>
+              <tr class="skeleton-row"><td colspan="7"><span class="skeleton" style="width:100%;height:18px;display:block"></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <span>CheckBalance — Binance API</span>
+    <span>Auto-refreshes every <strong>30s</strong></span>
+  </footer>
+
+  <script src="app.js"></script>
+
+  <!-- Toast notification -->
+  <div id="toast" class="toast" style="display:none"></div>
+
+</body>
+</html>

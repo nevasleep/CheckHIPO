@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CheckBalance — Bank VN</title>
+  <meta name="description" content="Vietnamese bank transaction tracker — real-time cash flow monitoring via SePay" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+  <!-- ── Header ── -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#F0B90B" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+        <span class="logo-text">CheckBalance</span>
+      </div>
+
+      <!-- Page Nav Tabs -->
+      <nav class="page-nav">
+        <a href="index.html" class="page-nav-tab" id="tab-binance">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+          </svg>
+          Binance
+        </a>
+        <a href="bank.html" class="page-nav-tab active" id="tab-bank">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="7" width="20" height="14" rx="2" />
+            <path d="M16 7V5a2 2 0 0 0-4 0v2M12 12v5M8 12v5" />
+          </svg>
+          Bank VN
+        </a>
+      </nav>
+
+      <!-- Breadcrumb -->
+      <div class="header-crumb">
+        <span class="crumb-item crumb-active">Bank Transactions</span>
+      </div>
+
+      <div class="header-right">
+        <div class="refresh-info">
+          <span class="refresh-dot" id="refresh-dot"></span>
+          <span id="refresh-label">Connecting…</span>
+        </div>
+        <!-- Live SSE indicator -->
+        <div class="live-badge inactive" id="live-badge">
+          <span class="live-badge-dot"></span>
+          <span id="live-label">Offline</span>
+        </div>
+        <button class="btn-refresh" id="btn-refresh" onclick="fetchTransactions()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 4v6h-6M1 20v-6h6" />
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+          </svg>
+          Refresh
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Main ── -->
+  <main class="main">
+
+    <!-- Config Warning (hidden when configured) -->
+    <div class="bank-config-warning" id="config-warning" style="display:none">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="8" x2="12" y2="12" />
+        <line x1="12" y1="16" x2="12.01" y2="16" />
+      </svg>
+      <div class="bank-config-warning-text">
+        <strong>SePay API Token not configured</strong>
+        Open <code>.env</code> and set <code>SEPAY_API_TOKEN=your_token_here</code>, then restart the server.
+        Get your token from <a href="https://my.sepay.vn" target="_blank" style="color:var(--yellow)">my.sepay.vn</a> →
+        API → Tạo API Token.
+      </div>
+    </div>
+
+    <!-- Summary Banner -->
+    <div class="bank-banner" id="bank-banner">
+      <div class="bank-stat-card in">
+        <div class="bsc-label">Money In (Today)</div>
+        <div class="bsc-value green" id="stat-in"><span class="skeleton skeleton-lg"></span></div>
+        <div class="bsc-sub" id="stat-in-count">— transactions</div>
+      </div>
+      <div class="bank-stat-card out">
+        <div class="bsc-label">Money Out (Today)</div>
+        <div class="bsc-value red" id="stat-out"><span class="skeleton skeleton-lg"></span></div>
+        <div class="bsc-sub" id="stat-out-count">— transactions</div>
+      </div>
+      <div class="bank-stat-card" id="stat-net-card">
+        <div class="bsc-label">Net Flow (Today)</div>
+        <div class="bsc-value" id="stat-net"><span class="skeleton skeleton-lg"></span></div>
+        <div class="bsc-sub" id="stat-net-sub">Inflow − Outflow</div>
+      </div>
+      <div class="bank-stat-card total">
+        <div class="bsc-label">Total Transactions</div>
+        <div class="bsc-value purple" id="stat-total"><span class="skeleton skeleton-sm"></span></div>
+        <div class="bsc-sub" id="stat-total-sub">In memory</div>
+      </div>
+    </div>
+
+    <!-- Transaction Table Section -->
+    <div class="section">
+      <div class="section-header">
+        <h2 class="section-title">Transactions</h2>
+        <div class="filter-bar">
+          <button class="filter-pill active" id="filter-all" onclick="setFilter('all')">All</button>
+          <button class="filter-pill" id="filter-in" onclick="setFilter('in')">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M12 19V5M5 12l7-7 7 7" />
+            </svg>
+            Money In
+          </button>
+          <button class="filter-pill" id="filter-out" onclick="setFilter('out')">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M12 5v14M19 12l-7 7-7-7" />
+            </svg>
+            Money Out
+          </button>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="bank-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Date &amp; Time</th>
+              <th>Bank / Account</th>
+              <th>Type</th>
+              <th>Amount (VND)</th>
+              <th>Balance</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody id="tx-tbody">
+            <!-- Skeleton rows -->
+            <tr class="skeleton-row">
+              <td colspan="7"><span class="skeleton" style="width:100%;height:18px;display:block"></span></td>
+            </tr>
+            <tr class="skeleton-row">
+              <td colspan="7"><span class="skeleton" style="width:100%;height:18px;display:block"></span></td>
+            </tr>
+            <tr class="skeleton-row">
+              <td colspan="7"><span class="skeleton" style="width:100%;height:18px;display:block"></span></td>
+            </tr>
+            <tr class="skeleton-row">
+              <td colspan="7"><span class="skeleton" style="width:100%;height:18px;display:block"></span></td>
+            </tr>
+            <tr class="skeleton-row">
+              <td colspan="7"><span class="skeleton" style="width:100%;height:18px;display:block"></span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <span>CheckBalance — Bank VN via SePay</span>
+    <span id="footer-time">Real-time via SSE + SePay Webhooks</span>
+  </footer>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" style="display:none"></div>
+
+  <script src="bank.js"></script>
+
+</body>
+
+</html>
