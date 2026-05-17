@@ -94,8 +94,99 @@ async function fetchTeamData() {
   return { members, teamTotal, activeCount, fetchedAt: Date.now() };
 }
 
+// ─── Deposit status mapping ──────────────────────────────────────────────────
+const DEPOSIT_STATUS = {
+  0: 'Pending',
+  1: 'Success',
+  2: 'Rejected',
+  6: 'Credited (cannot withdraw)',
+  7: 'Wrong Deposit',
+  8: 'Waiting User Confirm',
+};
+
+// ─── Withdrawal status mapping ───────────────────────────────────────────────
+const WITHDRAW_STATUS = {
+  0: 'Email Sent',
+  1: 'Cancelled',
+  2: 'Awaiting Approval',
+  3: 'Rejected',
+  4: 'Processing',
+  5: 'Failure',
+  6: 'Completed',
+};
+
+// ─── Fetch one member's transaction history (deposits + withdrawals) ─────────
+async function fetchMemberTransactions(member, lookbackMs) {
+  if (!isConfigured(member)) return [];
+
+  const startTime = Date.now() - (lookbackMs || 24 * 60 * 60 * 1000); // default 24h
+
+  try {
+    const [deposits, withdrawals] = await Promise.all([
+      bGet('/sapi/v1/capital/deposit/hisrec', { startTime, includeSource: true, limit: 1000 }, member.apiKey, member.secretKey)
+        .catch((err) => { console.error(`[${member.name}] Deposit history error:`, err.response?.data?.msg || err.message); return []; }),
+      bGet('/sapi/v1/capital/withdraw/history', { startTime, limit: 1000 }, member.apiKey, member.secretKey)
+        .catch((err) => { console.error(`[${member.name}] Withdraw history error:`, err.response?.data?.msg || err.message); return []; }),
+    ]);
+
+    const txs = [];
+
+    // Normalize deposits
+    (Array.isArray(deposits) ? deposits : []).forEach((d) => {
+      const dt = new Date(d.insertTime);
+      txs.push({
+        uniqueId: `dep_${member.letter}_${d.id || d.txId}`,
+        date: dt.toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: '2-digit', year: 'numeric' }),
+        time: dt.toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
+        employeeName: member.name,
+        type: 'Deposit',
+        address: d.address || 'N/A',
+        network: d.network || '',
+        amount: `${parseFloat(d.amount)} ${d.coin}`,
+        status: DEPOSIT_STATUS[d.status] || `Unknown (${d.status})`,
+        txId: d.txId || '',
+        timestamp: dt.getTime(),
+      });
+    });
+
+    // Normalize withdrawals
+    (Array.isArray(withdrawals) ? withdrawals : []).forEach((w) => {
+      const dt = new Date(w.applyTime);
+      txs.push({
+        uniqueId: `wtd_${member.letter}_${w.id}`,
+        date: dt.toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: '2-digit', year: 'numeric' }),
+        time: dt.toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
+        employeeName: member.name,
+        type: 'Withdrawal',
+        address: w.address || 'N/A',
+        network: w.network || '',
+        amount: `${parseFloat(w.amount)} ${w.coin}`,
+        status: WITHDRAW_STATUS[w.status] || `Unknown (${w.status})`,
+        txId: w.txId || w.id || '',
+        timestamp: dt.getTime(),
+      });
+    });
+
+    return txs;
+  } catch (err) {
+    console.error(`[${member.name}] Transaction fetch error:`, err.response?.data?.msg || err.message);
+    return [];
+  }
+}
+
+// ─── Fetch all members' transactions ─────────────────────────────────────────
+async function fetchAllTransactions(lookbackMs) {
+  const members = getMembers();
+  const allTxArrays = await Promise.all(members.map((m) => fetchMemberTransactions(m, lookbackMs)));
+  const allTxs = allTxArrays.flat();
+  // Sort by timestamp ascending (oldest first → newest at bottom of sheet)
+  allTxs.sort((a, b) => a.timestamp - b.timestamp);
+  return allTxs;
+}
+
 module.exports = {
   BASE_URL, LETTERS, STABLECOINS,
   getMembers, isConfigured, sign, bGet, bPost, usdPrice,
   fetchMember, fetchTeamData,
+  fetchMemberTransactions, fetchAllTransactions,
 };

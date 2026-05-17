@@ -6,7 +6,8 @@ const path = require('path');
 const cron = require('node-cron');
 const { sendToLark } = require('./lark');
 const { startLarkBot } = require('./lark-bot');
-const { BASE_URL, getMembers, isConfigured, fetchMember, fetchTeamData } = require('./binance');
+const { BASE_URL, getMembers, isConfigured, fetchMember, fetchTeamData, fetchAllTransactions } = require('./binance');
+const { appendBalanceRow, appendTransactionRows } = require('./google-sheets');
 
 // ─── SePay in-memory store ────────────────────────────────────────────────────
 const BANK_TX_MAX = 500;                 // keep last 500 transactions in memory
@@ -82,6 +83,63 @@ async function postTeamToLark() {
     console.error('[Lark] ❌ Failed to send:', err.message);
   }
 }
+
+// ─── Helper: fetch team data and export to Sheets ─────────────────────────────
+async function exportToSheets() {
+  try {
+    console.log('[Sheets] Fetching team data for export...');
+    const teamData = await fetchTeamData();
+    await appendBalanceRow(teamData);
+    console.log('[Sheets] ✅ Balance appended to Google Sheets successfully.');
+  } catch (err) {
+    console.error('[Sheets] ❌ Failed to export:', err.message);
+  }
+}
+
+// ─── Helper: sync Binance transactions to Sheet 2 (real-time) ────────────────
+let txSyncRunning = false;
+async function syncTransactionsToSheets() {
+  if (txSyncRunning) return; // prevent overlapping runs
+  txSyncRunning = true;
+  try {
+    const txs = await fetchAllTransactions(24 * 60 * 60 * 1000); // last 24h
+    if (txs.length === 0) {
+      txSyncRunning = false;
+      return;
+    }
+    const result = await appendTransactionRows(txs);
+    if (result.appended > 0) {
+      console.log(`[Sheets TX] ✅ Appended ${result.appended} new transactions to Sheet 2 (skipped ${result.skipped} duplicates)`);
+    }
+  } catch (err) {
+    console.error('[Sheets TX] ❌ Failed to sync transactions:', err.message);
+  }
+  txSyncRunning = false;
+}
+
+// ─── POST /api/sheets/export — Manual trigger (Sheet 1: Balances) ─────────────
+app.post('/api/sheets/export', async (req, res) => {
+  try {
+    const teamData = await fetchTeamData();
+    await appendBalanceRow(teamData);
+    res.json({ ok: true, message: 'Balance appended to Google Sheets successfully!' });
+  } catch (err) {
+    console.error('[Sheets Export Error]', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─── POST /api/sheets/transactions — Manual trigger (Sheet 2: Transactions) ──
+app.post('/api/sheets/transactions', async (req, res) => {
+  try {
+    const txs = await fetchAllTransactions(90 * 24 * 60 * 60 * 1000); // last 90 days for manual
+    const result = await appendTransactionRows(txs);
+    res.json({ ok: true, message: `Synced ${result.appended} new transactions (${result.skipped} already existed).` });
+  } catch (err) {
+    console.error('[Sheets TX Manual Error]', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 // ─── SePay Routes ─────────────────────────────────────────────────────────────
 
@@ -184,6 +242,7 @@ app.listen(PORT, () => {
   const webhookUrl = process.env.LARK_WEBHOOK_URL;
   const cronExpr = process.env.LARK_CRON || '0 9 * * *';
   const sepayToken = process.env.SEPAY_API_TOKEN;
+  const sheetId = process.env.GOOGLE_SHEET_ID;
 
   if (webhookUrl && webhookUrl !== 'your_webhook_url_here') {
     if (cron.validate(cronExpr)) {
@@ -200,6 +259,20 @@ app.listen(PORT, () => {
     console.log(`   SePay:    ✅ Configured — Bank VN at http://localhost:${PORT}/bank.html`);
   } else {
     console.log(`   SePay:    ⚫ Not configured (add SEPAY_API_TOKEN to .env)`);
+  }
+
+  if (sheetId && sheetId !== 'your_sheet_id_here') {
+    cron.schedule('*/5 * * * *', exportToSheets, { timezone: 'Asia/Bangkok' });
+    console.log(`   Sheet 1:  ✅ Balance export scheduled (every 5 min)`);
+
+    // Sheet 2: Real-time transaction sync — every 1 minute
+    cron.schedule('* * * * *', syncTransactionsToSheets, { timezone: 'Asia/Bangkok' });
+    console.log(`   Sheet 2:  ✅ Transaction sync scheduled (every 1 min — real-time)`);
+
+    // Also run immediately on startup to catch up
+    setTimeout(syncTransactionsToSheets, 5000);
+  } else {
+    console.log(`   Sheets:   ⚫ Not configured (add GOOGLE_SHEET_ID to .env)`);
   }
 
   // Start Lark App Bot (WebSocket — for @mention queries)
