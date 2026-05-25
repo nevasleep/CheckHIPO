@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wallet Monitor — On-Chain Transactions</title>
+  <meta name="description" content="Real-time on-chain transaction monitor for Ethereum USDT, BSC USDT, Arbitrum USDC and Tron USDT wallets." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/wallets.css" />
+</head>
+<body>
+  <!-- ── Header ─────────────────────────────────────────── -->
+  <header class="wm-header">
+    <div class="wm-header-inner">
+      <div class="wm-logo">
+        <span class="wm-logo-icon">⛓</span>
+        <span class="wm-logo-text">Wallet Monitor</span>
+      </div>
+
+      <nav class="wm-nav">
+        <a href="/" class="wm-nav-link">📊 Dashboard</a>
+        <a href="/bank.html" class="wm-nav-link">🏦 Bank</a>
+        <a href="/wallets.html" class="wm-nav-link wm-nav-active">⛓ On-Chain</a>
+      </nav>
+
+      <div class="wm-header-right">
+        <div id="wm-status" class="wm-status-dot wm-status-loading" title="Connection status"></div>
+        <span id="wm-last-update" class="wm-last-update">Connecting…</span>
+        <button id="wm-refresh-btn" class="wm-btn-refresh" title="Refresh now">↻</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Balance Cards ──────────────────────────────────── -->
+  <main class="wm-main">
+    <section class="wm-balances">
+      <div class="wm-balance-card" id="card-eth-usdt">
+        <div class="wm-card-chain">
+          <img src="https://cryptologos.cc/logos/ethereum-eth-logo.svg" class="wm-chain-icon" onerror="this.style.display='none'" alt="ETH" />
+          <span class="wm-chain-label">Ethereum</span>
+          <span class="wm-token-badge eth">USDT</span>
+        </div>
+        <div class="wm-card-balance"><span class="wm-balance-num" id="bal-eth-usdt">—</span></div>
+        <div class="wm-card-addr"><a href="https://etherscan.io/address/0x4E8f62a9FbcaAd5ab8984e0fC00Ffb134735C54C" target="_blank" class="wm-addr-link">0x4E8f…C54C</a></div>
+        <div class="wm-card-txcount"><span id="cnt-eth-usdt">0</span> txs today</div>
+      </div>
+
+      <div class="wm-balance-card" id="card-bsc-usdt">
+        <div class="wm-card-chain">
+          <img src="https://cryptologos.cc/logos/bnb-bnb-logo.svg" class="wm-chain-icon" onerror="this.style.display='none'" alt="BNB" />
+          <span class="wm-chain-label">BNB Smart Chain</span>
+          <span class="wm-token-badge bsc">USDT</span>
+        </div>
+        <div class="wm-card-balance"><span class="wm-balance-num" id="bal-bsc-usdt">—</span></div>
+        <div class="wm-card-addr"><a href="https://bscscan.com/address/0x4E8f62a9FbcaAd5ab8984e0fC00Ffb134735C54C" target="_blank" class="wm-addr-link">0x4E8f…C54C</a></div>
+        <div class="wm-card-txcount"><span id="cnt-bsc-usdt">0</span> txs today</div>
+      </div>
+
+      <div class="wm-balance-card" id="card-arb-usdc">
+        <div class="wm-card-chain">
+          <img src="https://cryptologos.cc/logos/arbitrum-arb-logo.svg" class="wm-chain-icon" onerror="this.style.display='none'" alt="ARB" />
+          <span class="wm-chain-label">Arbitrum</span>
+          <span class="wm-token-badge arb">USDC</span>
+        </div>
+        <div class="wm-card-balance"><span class="wm-balance-num" id="bal-arb-usdc">—</span></div>
+        <div class="wm-card-addr"><a href="https://arbiscan.io/address/0x4E8f62a9FbcaAd5ab8984e0fC00Ffb134735C54C" target="_blank" class="wm-addr-link">0x4E8f…C54C</a></div>
+        <div class="wm-card-txcount"><span id="cnt-arb-usdc">0</span> txs today</div>
+      </div>
+
+      <div class="wm-balance-card" id="card-tron-usdt">
+        <div class="wm-card-chain">
+          <img src="https://cryptologos.cc/logos/tron-trx-logo.svg" class="wm-chain-icon" onerror="this.style.display='none'" alt="TRX" />
+          <span class="wm-chain-label">Tron</span>
+          <span class="wm-token-badge tron">USDT</span>
+        </div>
+        <div class="wm-card-balance"><span class="wm-balance-num" id="bal-tron-usdt">—</span></div>
+        <div class="wm-card-addr"><a href="https://tronscan.org/#/address/TB4jzXUFDV2b6HLq5qXPrxh6KtSLy8SmQ2" target="_blank" class="wm-addr-link">TB4j…SmQ2</a></div>
+        <div class="wm-card-txcount"><span id="cnt-tron-usdt">0</span> txs today</div>
+      </div>
+    </section>
+
+    <!-- ── Filters ─────────────────────────────────────── -->
+    <section class="wm-filters">
+      <div class="wm-filter-group">
+        <label class="wm-filter-label">Chain</label>
+        <div class="wm-filter-pills" id="filter-chain">
+          <button class="wm-pill active" data-chain="all">All</button>
+          <button class="wm-pill" data-chain="eth-usdt">Ethereum</button>
+          <button class="wm-pill" data-chain="bsc-usdt">BNB Chain</button>
+          <button class="wm-pill" data-chain="arb-usdc">Arbitrum</button>
+          <button class="wm-pill" data-chain="tron-usdt">Tron</button>
+        </div>
+      </div>
+      <div class="wm-filter-group">
+        <label class="wm-filter-label">Direction</label>
+        <div class="wm-filter-pills" id="filter-dir">
+          <button class="wm-pill active" data-dir="all">All</button>
+          <button class="wm-pill in" data-dir="in">🟢 Incoming</button>
+          <button class="wm-pill out" data-dir="out">🔴 Outgoing</button>
+        </div>
+      </div>
+      <div class="wm-filter-right">
+        <span id="wm-tx-count" class="wm-tx-count">0 transactions</span>
+      </div>
+    </section>
+
+    <!-- ── Transaction Table ───────────────────────────── -->
+    <section class="wm-table-section">
+      <div class="wm-table-wrap">
+        <table class="wm-table" id="wm-table">
+          <thead>
+            <tr>
+              <th>Direction</th>
+              <th>Chain / Token</th>
+              <th>Amount</th>
+              <th>From</th>
+              <th>To</th>
+              <th>Time</th>
+              <th>Tx Hash</th>
+            </tr>
+          </thead>
+          <tbody id="wm-tbody">
+            <tr class="wm-empty-row">
+              <td colspan="7">
+                <div class="wm-empty">
+                  <span class="wm-empty-icon">⏳</span>
+                  <span>Loading transactions…</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="/wallets.js"></script>
+</body>
+</html>

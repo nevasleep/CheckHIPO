@@ -6,8 +6,9 @@ const path = require('path');
 const cron = require('node-cron');
 const { sendToLark } = require('./lark');
 const { startLarkBot } = require('./lark-bot');
-const { BASE_URL, getMembers, isConfigured, fetchMember, fetchTeamData, fetchAllTransactions } = require('./binance');
-const { appendBalanceRow, appendTransactionRows } = require('./google-sheets');
+const { BASE_URL, getMembers, isConfigured, fetchMember, fetchTeamData, fetchAllTransactions, PROXY_CONFIG } = require('./binance');
+const { appendBalanceRow, appendTransactionRows, deleteOldBalanceRows } = require('./google-sheets');
+const { txLog, WALLETS } = require('./telegram-wallet-bot');
 
 // ─── SePay in-memory store ────────────────────────────────────────────────────
 const BANK_TX_MAX = 500;                 // keep last 500 transactions in memory
@@ -53,7 +54,7 @@ app.get('/api/portfolio', async (req, res) => {
   if (!isConfigured(member)) return res.status(503).json({ error: `Member ${member.name} API keys not configured in .env` });
   try {
     const pm = {};
-    (await axios.get(`${BASE_URL}/api/v3/ticker/price`)).data.forEach((t) => { pm[t.symbol] = parseFloat(t.price); });
+    (await axios.get(`${BASE_URL}/api/v3/ticker/price`, PROXY_CONFIG)).data.forEach((t) => { pm[t.symbol] = parseFloat(t.price); });
     res.json(await fetchMember(member, pm));
   } catch (err) {
     res.status(500).json({ error: err.response?.data?.msg || 'Failed to fetch portfolio.' });
@@ -233,6 +234,80 @@ app.get('/api/bank/transactions', async (req, res) => {
   }
 });
 
+// ─── Wallet Monitor API ──────────────────────────────────────────────────────
+
+const walletSseClients = new Set();
+
+function broadcastWalletSSE(event, data) {
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of walletSseClients) {
+    try { client.write(payload); } catch { walletSseClients.delete(client); }
+  }
+}
+
+// Expose broadcastWalletSSE globally so telegram-wallet-bot.js can push live events
+global.__broadcastWalletSSE = broadcastWalletSSE;
+
+// GET /api/wallets/transactions — full tx log for all wallets
+app.get('/api/wallets/transactions', (req, res) => {
+  const transactions = {};
+  for (const wallet of WALLETS) {
+    transactions[wallet.id] = txLog[wallet.id] || [];
+  }
+  res.json({ transactions, fetchedAt: Date.now() });
+});
+
+// GET /api/wallets/balance/:walletId — current token balance for one wallet
+app.get('/api/wallets/balance/:walletId', async (req, res) => {
+  const wallet = WALLETS.find((w) => w.id === req.params.walletId);
+  if (!wallet) return res.status(404).json({ error: 'Unknown wallet id' });
+
+  try {
+    let balance = '0';
+
+    if (wallet.type === 'evm') {
+      const params = {
+        module: 'account', action: 'tokenbalance',
+        contractaddress: wallet.contract,
+        address: wallet.address,
+        tag: 'latest',
+      };
+      const { data } = await axios.get(wallet.apiUrl, { ...PROXY_CONFIG, params, timeout: 10000 });
+      balance = data.result || '0';
+    } else {
+      // Tron TRC-20 balance
+      const url = `https://api.trongrid.io/v1/accounts/${wallet.address}`;
+      const { data } = await axios.get(url, { ...PROXY_CONFIG, timeout: 10000 });
+      const trc20 = data?.data?.[0]?.trc20 || [];
+      const entry = trc20.find((t) => Object.keys(t)[0] === wallet.contract);
+      balance = entry ? Object.values(entry)[0] : '0';
+    }
+
+    res.json({ walletId: wallet.id, balance, fetchedAt: Date.now() });
+  } catch (err) {
+    console.error(`[Wallet Balance] ${wallet.id}:`, err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// GET /api/wallets/stream — SSE for real-time tx push to the dashboard
+app.get('/api/wallets/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  walletSseClients.add(res);
+
+  // Send current txLog on connect so fresh tabs see existing data immediately
+  const transactions = {};
+  for (const wallet of WALLETS) { transactions[wallet.id] = txLog[wallet.id] || []; }
+  res.write(`event: init\ndata: ${JSON.stringify({ transactions })}\n\n`);
+
+  const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch { clearInterval(ping); } }, 25000);
+  req.on('close', () => { walletSseClients.delete(res); clearInterval(ping); });
+});
+
 // ─── Start server + Lark cron ─────────────────────────────────────────────────
 app.listen(PORT, () => {
   const members = getMembers();
@@ -265,6 +340,18 @@ app.listen(PORT, () => {
     cron.schedule('*/5 * * * *', exportToSheets, { timezone: 'Asia/Bangkok' });
     console.log(`   Sheet 1:  ✅ Balance export scheduled (every 5 min)`);
 
+    // Sheet 1: Daily cleanup — runs at 00:01 Asia/Bangkok every day
+    // Deletes rows older than 2 days ago (keeps today + yesterday)
+    cron.schedule('1 0 * * *', async () => {
+      console.log('[Sheets Cleanup] Running daily old-row cleanup...');
+      try {
+        await deleteOldBalanceRows();
+      } catch (err) {
+        console.error('[Sheets Cleanup] ❌ Failed:', err.message);
+      }
+    }, { timezone: 'Asia/Bangkok' });
+    console.log(`   Sheet 1:  ✅ Daily cleanup scheduled (00:01 Asia/Bangkok) — keeps today & yesterday`);
+
     // Sheet 2: Real-time transaction sync — every 1 minute
     cron.schedule('* * * * *', syncTransactionsToSheets, { timezone: 'Asia/Bangkok' });
     console.log(`   Sheet 2:  ✅ Transaction sync scheduled (every 1 min — real-time)`);
@@ -277,6 +364,16 @@ app.listen(PORT, () => {
 
   // Start Lark App Bot (WebSocket — for @mention queries)
   startLarkBot();
+
+  // Wallet Monitor
+  const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+  const telegramChat  = process.env.TELEGRAM_CHAT_ID;
+  if (telegramToken && telegramToken !== 'your_telegram_bot_token_here') {
+    console.log(`   Wallet Bot: ✅ Telegram configured — dashboard at http://localhost:${PORT}/wallets.html`);
+  } else {
+    console.log(`   Wallet Bot: ⚫ Telegram not configured (add TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID to .env)`);
+    console.log(`               Dashboard still available at http://localhost:${PORT}/wallets.html`);
+  }
 
   console.log();
 });

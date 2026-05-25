@@ -1,3 +1,6 @@
 node_modules/
 .env
 google-credentials.json
+wallet-state.json
+sacred-footing-496809-i1.json
+*.json.key

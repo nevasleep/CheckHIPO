@@ -193,4 +193,102 @@ async function appendTransactionRows(transactions) {
   return { appended: newTxs.length, skipped: transactions.length - newTxs.length };
 }
 
-module.exports = { appendBalanceRow, appendTransactionRows };
+// ─── Sheet 1: Delete old balance rows ───────────────────────────────────────
+
+/**
+ * Delete rows in GOOGLE_SHEET_NAME (So Du HIPO) whose timestamp is
+ * 2 or more days before today.
+ *
+ * Rule: when this runs on Day N, delete rows from Day N-2 and earlier.
+ * Example: runs May 23 → deletes May 21 and earlier, keeps May 22 & May 23.
+ *
+ * The timestamp column (A) is written by appendBalanceRow in the format:
+ *   "May 22, 2026, 09:00:00 AM"  (en-US locale, Asia/Bangkok)
+ * We parse the date part (first 3 tokens) to get the calendar day.
+ */
+async function deleteOldBalanceRows() {
+  const sheetId   = process.env.GOOGLE_SHEET_ID;
+  const sheetName = process.env.GOOGLE_SHEET_NAME || 'Sheet1';
+
+  if (!sheetId || sheetId === 'your_sheet_id_here') return;
+
+  const sheets = await getSheetsClient();
+
+  // Fetch all values from column A (timestamps)
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: `${sheetName}!A:A`,
+  });
+
+  const rows = res.data.values || [];
+  if (rows.length === 0) return;
+
+  // Cutoff: anything strictly before (today - 1 day) in Asia/Bangkok
+  // i.e. keep today and yesterday, delete the day before yesterday and older.
+  const nowBangkok = new Date(
+    new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
+  );
+  // Set to midnight of (today - 1 day) in Bangkok
+  const cutoff = new Date(nowBangkok);
+  cutoff.setDate(cutoff.getDate() - 1);
+  cutoff.setHours(0, 0, 0, 0);
+
+  // Get the spreadsheet metadata to find the sheet's numeric ID
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+  const sheetObj = meta.data.sheets.find(
+    (s) => s.properties.title === sheetName
+  );
+  if (!sheetObj) {
+    console.warn(`[Sheets Cleanup] Sheet "${sheetName}" not found.`);
+    return;
+  }
+  const sheetNumericId = sheetObj.properties.sheetId;
+
+  // Collect row indices to delete (0-indexed; row 0 = header, skip it)
+  const toDelete = [];
+  for (let i = 1; i < rows.length; i++) {
+    const cell = (rows[i] && rows[i][0]) ? rows[i][0] : '';
+    if (!cell) continue;
+
+    // Parse the date portion from the timestamp string
+    // e.g. "May 22, 2026, 09:00:00 AM" → new Date("May 22, 2026")
+    const datePart = cell.split(',').slice(0, 2).join(',').trim(); // "May 22, 2026"
+    const rowDate = new Date(datePart);
+    if (isNaN(rowDate.getTime())) continue; // skip unparseable cells (e.g. header)
+
+    // If the row's date is strictly before the cutoff day, mark for deletion
+    if (rowDate < cutoff) {
+      toDelete.push(i); // 0-indexed row number in the sheet data array
+    }
+  }
+
+  if (toDelete.length === 0) {
+    console.log('[Sheets Cleanup] No old rows to delete.');
+    return;
+  }
+
+  // Build deleteDimension requests — must be processed in reverse order
+  // so that deleting earlier rows doesn't shift later indices.
+  const requests = toDelete
+    .sort((a, b) => b - a) // descending
+    .map((rowIdx) => ({
+      deleteDimension: {
+        range: {
+          sheetId:    sheetNumericId,
+          dimension:  'ROWS',
+          startIndex: rowIdx,     // 0-indexed, inclusive
+          endIndex:   rowIdx + 1, // exclusive
+        },
+      },
+    }));
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: sheetId,
+    requestBody:   { requests },
+  });
+
+  const cutoffLabel = cutoff.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  console.log(`[Sheets Cleanup] ✅ Deleted ${toDelete.length} row(s) older than ${cutoffLabel} from "${sheetName}".`);
+}
+
+module.exports = { appendBalanceRow, appendTransactionRows, deleteOldBalanceRows };

@@ -3,8 +3,22 @@
 
 const crypto = require('crypto');
 const axios = require('axios');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 
-const BASE_URL = 'https://api.binance.com';
+// ─── Proxy-aware axios instance ──────────────────────────────────────────────
+// Set HTTPS_PROXY in .env to route all Binance requests through a proxy.
+// Example: HTTPS_PROXY=http://user:pass@proxy-host:port
+function makeAxiosConfig() {
+  const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy;
+  if (proxyUrl) {
+    console.log('[Binance] Using proxy:', proxyUrl.replace(/:[^:@]*@/, ':***@'));
+    return { httpsAgent: new HttpsProxyAgent(proxyUrl), proxy: false };
+  }
+  return {};
+}
+const PROXY_CONFIG = makeAxiosConfig();
+
+const BASE_URL = 'https://api1.binance.com';
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 const STABLECOINS = ['USDT', 'BUSD', 'USDC', 'FDUSD', 'TUSD', 'DAI', 'USDP'];
 
@@ -31,13 +45,13 @@ function sign(qs, secret) {
 async function bGet(endpoint, params, apiKey, secretKey) {
   const qs = new URLSearchParams({ ...params, timestamp: Date.now() }).toString();
   const url = `${BASE_URL}${endpoint}?${qs}&signature=${sign(qs, secretKey)}`;
-  return (await axios.get(url, { headers: { 'X-MBX-APIKEY': apiKey } })).data;
+  return (await axios.get(url, { ...PROXY_CONFIG, headers: { 'X-MBX-APIKEY': apiKey } })).data;
 }
 
 async function bPost(endpoint, params, apiKey, secretKey) {
   const qs = new URLSearchParams({ ...params, timestamp: Date.now() }).toString();
   const url = `${BASE_URL}${endpoint}?${qs}&signature=${sign(qs, secretKey)}`;
-  return (await axios.post(url, null, { headers: { 'X-MBX-APIKEY': apiKey } })).data;
+  return (await axios.post(url, null, { ...PROXY_CONFIG, headers: { 'X-MBX-APIKEY': apiKey } })).data;
 }
 
 function usdPrice(asset, pm) {
@@ -87,7 +101,12 @@ async function fetchMember(member, priceMap) {
 // ─── Fetch full team data (prices + all members) ─────────────────────────────
 async function fetchTeamData() {
   const pm = {};
-  (await axios.get(`${BASE_URL}/api/v3/ticker/price`)).data.forEach((t) => { pm[t.symbol] = parseFloat(t.price); });
+  try {
+    const response = await axios.get(`${BASE_URL}/api/v3/ticker/price`, PROXY_CONFIG);
+    response.data.forEach((t) => { pm[t.symbol] = parseFloat(t.price); });
+  } catch (err) {
+    console.error('[Binance] Error fetching ticker prices:', err.response?.data?.msg || err.message);
+  }
   const members = await Promise.all(getMembers().map((m) => fetchMember(m, pm)));
   const teamTotal = members.reduce((s, m) => s + (m.totalUsd || 0), 0);
   const activeCount = members.filter((m) => m.status === 'ok').length;
@@ -185,7 +204,7 @@ async function fetchAllTransactions(lookbackMs) {
 }
 
 module.exports = {
-  BASE_URL, LETTERS, STABLECOINS,
+  BASE_URL, LETTERS, STABLECOINS, PROXY_CONFIG,
   getMembers, isConfigured, sign, bGet, bPost, usdPrice,
   fetchMember, fetchTeamData,
   fetchMemberTransactions, fetchAllTransactions,
