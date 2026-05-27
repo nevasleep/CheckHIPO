@@ -22,10 +22,12 @@ const { sendWalletAlertToLark } = require('./lark');
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const TELEGRAM_CHAT_ID   = process.env.TELEGRAM_CHAT_ID   || '';
-const POLL_INTERVAL_SEC  = parseInt(process.env.WALLET_POLL_INTERVAL_SEC || '60', 10);
-const TIMEZONE_OFFSET    = parseInt(process.env.TIMEZONE_OFFSET_HOURS    || '7',  10); // UTC+7
+const TELEGRAM_BOT_TOKEN  = process.env.TELEGRAM_BOT_TOKEN || '';
+const TELEGRAM_CHAT_ID    = process.env.TELEGRAM_CHAT_ID   || '';
+const POLL_INTERVAL_SEC   = parseInt(process.env.WALLET_POLL_INTERVAL_SEC || '60', 10);
+const TIMEZONE_OFFSET     = parseInt(process.env.TIMEZONE_OFFSET_HOURS   || '7',  10); // UTC+7
+// Minimum token amount to trigger a notification (applies to BSC dust/gas-fee txs)
+const BSC_MIN_NOTIFY_USDT = parseFloat(process.env.BSC_MIN_NOTIFY_USDT   || '1');
 
 // ─── Proxy (reuse the same HTTPS_PROXY as Binance) ───────────────────────────
 const _proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy || '';
@@ -421,6 +423,14 @@ async function runPoll() {
     const { newTxs } = await pollWallet(wallet, state);
 
     for (const tx of newTxs) {
+      const txAmount = Number(tx.rawAmount) / Math.pow(10, wallet.decimals);
+
+      // ── Skip dust / gas-fee transactions on BSC ────────────────────────────
+      if (wallet.type === 'bsc-rpc' && txAmount < BSC_MIN_NOTIFY_USDT) {
+        console.log(`[${wallet.id}] ⏭ Skipped small tx (${txAmount.toFixed(4)} ${wallet.token} < $${BSC_MIN_NOTIFY_USDT} threshold): ${tx.hash.slice(0, 12)}…`);
+        continue;
+      }
+
       console.log(`[${wallet.id}] 🔔 New ${tx.direction.toUpperCase()} tx: ${tx.hash.slice(0, 12)}… ${formatAmount(tx.rawAmount, wallet.decimals)} ${wallet.token}`);
 
       // Send Telegram + Lark + SSE push for every transaction
