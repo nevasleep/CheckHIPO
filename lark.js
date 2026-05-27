@@ -157,8 +157,8 @@ function buildWalletAlertCard(wallet, tx) {
         text: {
           tag: 'lark_md',
           content: [
-            `📤 **From:** \`${fromAddr}\``,
-            `📬 **To:**   \`${toAddr}\``,
+            `📤 **From:** **${fromAddr}**`,
+            `📬 **To:**   **${toAddr}**`,
           ].join('\n'),
         },
       },
