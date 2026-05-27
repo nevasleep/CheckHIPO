@@ -42,6 +42,7 @@ const EVM_ADDRESS  = '0x4E8f62a9FbcaAd5ab8984e0fC00Ffb134735C54C';
 const TRON_ADDRESS = 'TB4jzXUFDV2b6HLq5qXPrxh6KtSLy8SmQ2';
 
 const USDT_ETH  = '0xdAC17F958D2ee523a2206206994597C13D831ec7'; // USDT on Ethereum
+const USDC_ETH  = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'; // USDC on Ethereum
 const USDT_BSC  = '0x55d398326f99059fF775485246999027B3197955'; // USDT on BSC
 const USDC_ARB  = '0xaf88d065e77c8cC2239327C5EDb3A432268e5831'; // USDC on Arbitrum
 const USDT_TRON = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';        // USDT on Tron
@@ -55,6 +56,17 @@ const WALLETS = [
     decimals: 6,
     address:  EVM_ADDRESS,
     contract: USDT_ETH,
+    explorer: 'https://etherscan.io',
+    apiUrl:   'https://eth.blockscout.com/api',   // no API key required
+    type:     'evm',
+  },
+  {
+    id:       'eth-usdc',
+    chain:    'Ethereum',
+    token:    'USDC',
+    decimals: 6,
+    address:  EVM_ADDRESS,
+    contract: USDC_ETH,
     explorer: 'https://etherscan.io',
     apiUrl:   'https://eth.blockscout.com/api',   // no API key required
     type:     'evm',
