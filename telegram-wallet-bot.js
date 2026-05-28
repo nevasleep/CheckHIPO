@@ -443,14 +443,12 @@ async function runPoll() {
         console.error(`[Lark Wallet Alert] Failed for ${wallet.id}:`, err.message)
       );
 
-      // Upload to Lark Base (only for incoming transactions)
-      if (tx.direction === 'in') {
-        uploadTransactionToBase(wallet, tx).then(() => {
-          console.log(`[${wallet.id}] ✅ Synced to Lark Base`);
-        }).catch((err) => {
-          console.error(`[Lark Base] Failed for ${wallet.id}:`, err.message);
-        });
-      }
+      // Upload to Lark Base (lark-base.js will internally filter for Dung's wallet)
+      uploadTransactionToBase(wallet, tx).then((res) => {
+        if (!res.skipped) console.log(`[${wallet.id}] ✅ Synced to Lark Base`);
+      }).catch((err) => {
+        console.error(`[Lark Base] Failed for ${wallet.id}:`, err.message);
+      });
 
       if (typeof global.__broadcastWalletSSE === 'function') {
         global.__broadcastWalletSSE('transaction', { walletId: wallet.id, tx });
