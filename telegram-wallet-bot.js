@@ -19,6 +19,7 @@ const fs    = require('fs');
 const path  = require('path');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const { sendWalletAlertToLark } = require('./lark');
+const { uploadTransactionToBase } = require('./lark-base');
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -441,6 +442,15 @@ async function runPoll() {
       sendWalletAlertToLark(wallet, tx).catch((err) =>
         console.error(`[Lark Wallet Alert] Failed for ${wallet.id}:`, err.message)
       );
+
+      // Upload to Lark Base (only for incoming transactions)
+      if (tx.direction === 'in') {
+        uploadTransactionToBase(wallet, tx).then(() => {
+          console.log(`[${wallet.id}] ✅ Synced to Lark Base`);
+        }).catch((err) => {
+          console.error(`[Lark Base] Failed for ${wallet.id}:`, err.message);
+        });
+      }
 
       if (typeof global.__broadcastWalletSSE === 'function') {
         global.__broadcastWalletSSE('transaction', { walletId: wallet.id, tx });
