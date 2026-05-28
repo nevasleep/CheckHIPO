@@ -15,7 +15,7 @@ async function getTenantAccessToken() {
   if (_tenantAccessToken && Date.now() < _tokenExpireAt) {
     return _tenantAccessToken;
   }
-  
+
   const res = await axios.post('https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal', {
     app_id: process.env.LARK_APP_ID,
     app_secret: process.env.LARK_APP_SECRET
@@ -24,7 +24,7 @@ async function getTenantAccessToken() {
   if (res.data.code !== 0) {
     throw new Error('Failed to get Lark tenant_access_token: ' + JSON.stringify(res.data));
   }
-  
+
   _tenantAccessToken = res.data.tenant_access_token;
   _tokenExpireAt = Date.now() + (res.data.expire - 300) * 1000; // refresh 5 mins before expiry
   return _tenantAccessToken;
@@ -36,7 +36,7 @@ async function getTenantAccessToken() {
 async function uploadTransactionToBase(wallet, tx) {
   const appToken = 'WF5ebtzvhaQ60OsLC0ilbwf1gvc';
   const tableId = 'tblEDlO99GZj8I8K';
-  
+
   // Format Date (Vietnam timezone UTC+7)
   const TIMEZONE_OFFSET = parseInt(process.env.TIMEZONE_OFFSET_HOURS || '7', 10);
   const d = new Date(Number(tx.timestamp) * 1000);
@@ -56,19 +56,21 @@ async function uploadTransactionToBase(wallet, tx) {
   const dungWallet = 'TEskfVDdvuRXVA6UzVTABEsh13wex7xTzc'.toLowerCase();
   const isDung = tx.to && tx.to.toLowerCase() === dungWallet;
   const nguoiXin = isDung ? 'Nguyen Dinh Dung' : 'Người Xin Không Phải Dũng';
-  
+
   // From address
   const fromAddr = tx.from || '';
+
+  const amountNum = Number(tx.rawAmount) / Math.pow(10, wallet.decimals);
 
   const record = {
     fields: {
       'Date': timeStr,
-      'Văn Bản': 'Checked', 
-      'Số Tiền': amount + ' ' + wallet.token,
+      'Văn Bản': 'Checked',
+      'Số Tiền': amountNum,
       'Người Xin': nguoiXin,
-      'Bill Thanh Toán': txLink,
-      'Trạng Thái': 'Completed',
-      'Nguồn Tiền': `Source of Funds from ${fromAddr} + ${wallet.chain} + Anh Đức`
+      'Bill Thanh Toán': { link: txLink, text: txLink },
+      'Trạng Thái': 'Hoàn Thành',
+      'Nguồn Tiền': `${fromAddr} + ${wallet.chain} + Anh Đức`
     }
   };
 
@@ -82,7 +84,7 @@ async function uploadTransactionToBase(wallet, tx) {
   if (res.data.code !== 0) {
     throw new Error('Lark Base Write Error: ' + JSON.stringify(res.data));
   }
-  
+
   return res.data;
 }
 
