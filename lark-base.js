@@ -55,7 +55,13 @@ async function uploadTransactionToBase(wallet, tx) {
   // Recipient check
   const dungWallet = 'TEskfVDdvuRXVA6UzVTABEsh13wex7xTzc'.toLowerCase();
   const isDung = tx.to && tx.to.toLowerCase() === dungWallet;
-  const nguoiXin = isDung ? 'Nguyen Dinh Dung' : 'Người Xin Không Phải Dũng';
+  
+  if (!isDung) {
+    // Only upload to Larkbase if it's Dung's wallet
+    return { skipped: true, msg: "Not Dung's wallet, skipping Lark Base upload." };
+  }
+
+  const nguoiXin = 'Nguyen Dinh Dung';
 
   // From address
   const fromAddr = tx.from || '';
