@@ -4,11 +4,11 @@ const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
 const cron = require('node-cron');
-const { sendToLark } = require('./lark');
-const { startLarkBot } = require('./lark-bot');
-const { BASE_URL, getMembers, isConfigured, fetchMember, fetchTeamData, fetchAllTransactions, PROXY_CONFIG } = require('./binance');
-const { appendBalanceRow, appendTransactionRows, deleteOldBalanceRows } = require('./google-sheets');
-const { txLog, WALLETS } = require('./telegram-wallet-bot');
+const { sendToLark } = require('./services/lark');
+const { startLarkBot } = require('./services/lark-bot');
+const { BASE_URL, getMembers, isConfigured, fetchMember, fetchTeamData, fetchAllTransactions, PROXY_CONFIG } = require('./config/binance');
+const { appendBalanceRow, appendTransactionRows, deleteOldBalanceRows } = require('./config/google-sheets');
+const { txLog, WALLETS } = require('./services/telegram-wallet-bot');
 
 // ─── SePay in-memory store ────────────────────────────────────────────────────
 const BANK_TX_MAX = 500;                 // keep last 500 transactions in memory
@@ -34,7 +34,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, '../public')));
 
 // ─── GET /api/team ────────────────────────────────────────────────────────────
 app.get('/api/team', async (req, res) => {

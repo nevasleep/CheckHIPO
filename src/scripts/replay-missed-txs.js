@@ -10,8 +10,8 @@
 require('dotenv').config();
 const axios = require('axios');
 const { HttpsProxyAgent } = require('https-proxy-agent');
-const { sendWalletAlertToLark } = require('./lark');
-const { uploadTransactionToBase } = require('./lark-base');
+const { sendWalletAlertToLark } = require('../services/lark');
+const { uploadTransactionToBase } = require('../services/lark-base');
 
 // ─── Proxy ────────────────────────────────────────────────────
 const _proxyUrl = process.env.HTTPS_PROXY || '';

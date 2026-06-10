@@ -9,7 +9,7 @@
 
 const Lark = require('@larksuiteoapi/node-sdk');
 const axios = require('axios');
-const { fetchTeamData } = require('./binance');
+const { fetchTeamData } = require('../config/binance');
 
 // ─── Format helpers ──────────────────────────────────────────────────────────
 function fUsd(v) {
